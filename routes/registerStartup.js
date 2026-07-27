@@ -9,7 +9,11 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "contact@itechnebula.com";
+// Resend testing mode only allows the account owner's inbox until a domain is verified.
+// Once itechnebula.com is verified in Resend, set on Render:
+//   ADMIN_EMAIL=contact@itechnebula.com
+//   RESEND_FROM_EMAIL=Startup Submit Pool 2026 <noreply@itechnebula.com>
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "itechnebula@gmail.com";
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ||
   "Startup Submit Pool 2026 <onboarding@resend.dev>";
