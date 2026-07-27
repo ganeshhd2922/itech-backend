@@ -146,60 +146,77 @@ router.post(
 
       let adminEmailSent = false;
       let userEmailSent = false;
+      let emailError = null;
 
       if (resend) {
+        // Resend expects attachment content as base64 string
         const adminAttachments = [];
         if (pitchFile?.buffer) {
           adminAttachments.push({
             filename: pitchFile.originalname || "pitch-deck.pdf",
-            content: pitchFile.buffer,
+            content: Buffer.from(pitchFile.buffer).toString("base64"),
           });
         }
         if (logoFile?.buffer) {
           adminAttachments.push({
             filename: logoFile.originalname || "logo",
-            content: logoFile.buffer,
+            content: Buffer.from(logoFile.buffer).toString("base64"),
           });
         }
 
-        const adminResult = await resend.emails.send({
-          from: FROM_EMAIL,
-          to: ADMIN_EMAIL,
-          subject: `New Startup Registration — ${startup_name} (${registrationId})`,
-          html: buildAdminEmailHtml(record),
-          attachments: adminAttachments.length ? adminAttachments : undefined,
-        });
+        try {
+          const adminResult = await resend.emails.send({
+            from: FROM_EMAIL,
+            to: ADMIN_EMAIL,
+            subject: `New Startup Registration — ${startup_name} (${registrationId})`,
+            html: buildAdminEmailHtml(record),
+            attachments: adminAttachments.length ? adminAttachments : undefined,
+          });
 
-        if (adminResult.error) {
-          console.error("❌ Admin email error:", adminResult.error);
-        } else {
-          adminEmailSent = true;
-          console.log("📨 Admin notification sent:", adminResult.data?.id);
+          if (adminResult.error) {
+            emailError = adminResult.error.message || JSON.stringify(adminResult.error);
+            console.error("❌ Admin email error:", adminResult.error);
+          } else {
+            adminEmailSent = true;
+            console.log("📨 Admin notification sent:", adminResult.data?.id);
+          }
+        } catch (err) {
+          emailError = err.message || "Admin email send failed";
+          console.error("❌ Admin email exception:", err);
         }
 
-        const userResult = await resend.emails.send({
-          from: FROM_EMAIL,
-          to: email.trim(),
-          subject: `Your Startup Registration ID — ${registrationId}`,
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
-              <h2 style="color:#059669">Registration Received ✅</h2>
-              <p>Hi ${escapeHtml(founder_name)},</p>
-              <p>Thanks for registering <strong>${escapeHtml(startup_name)}</strong> for Startup Submit Pool 2026.</p>
-              <p style="margin:20px 0">Your Startup Registration ID is:<br/>
-                <span style="display:inline-block;margin-top:8px;font-size:20px;font-weight:bold;background:#ecfdf5;color:#065f46;padding:8px 16px;border-radius:8px">${registrationId}</span>
-              </p>
-              <p>Please save this ID — you'll need it to complete your registration.</p>
-            </div>
-          `,
-        });
+        try {
+          const userResult = await resend.emails.send({
+            from: FROM_EMAIL,
+            to: email.trim(),
+            subject: `Your Startup Registration ID — ${registrationId}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+                <h2 style="color:#059669">Registration Received ✅</h2>
+                <p>Hi ${escapeHtml(founder_name)},</p>
+                <p>Thanks for registering <strong>${escapeHtml(startup_name)}</strong> for Startup Submit Pool 2026.</p>
+                <p style="margin:20px 0">Your Startup Registration ID is:<br/>
+                  <span style="display:inline-block;margin-top:8px;font-size:20px;font-weight:bold;background:#ecfdf5;color:#065f46;padding:8px 16px;border-radius:8px">${registrationId}</span>
+                </p>
+                <p>Please save this ID — you'll need it to complete your registration.</p>
+              </div>
+            `,
+          });
 
-        if (userResult.error) {
-          console.error("❌ User email error:", userResult.error);
-        } else {
-          userEmailSent = true;
+          if (userResult.error) {
+            if (!emailError) {
+              emailError = userResult.error.message || JSON.stringify(userResult.error);
+            }
+            console.error("❌ User email error:", userResult.error);
+          } else {
+            userEmailSent = true;
+          }
+        } catch (err) {
+          if (!emailError) emailError = err.message || "User email send failed";
+          console.error("❌ User email exception:", err);
         }
       } else {
+        emailError = "RESEND_API_KEY missing on server";
         console.error("❌ RESEND_API_KEY missing — registration saved, emails skipped");
       }
 
@@ -208,6 +225,7 @@ router.post(
         registrationId,
         adminEmailSent,
         emailSent: userEmailSent,
+        emailError: emailError || undefined,
         message: adminEmailSent
           ? "Registration successful."
           : "Registration saved. Admin notification email could not be sent — your ID is shown on screen.",
