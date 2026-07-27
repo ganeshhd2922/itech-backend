@@ -10,6 +10,7 @@ const cors = require("cors");
 
 const sendEbookRoutes = require("./routes/sendEbook");
 const razorpayRoutes = require("./routes/razorpay-payment");
+const registerStartupRoutes = require("./routes/registerStartup"); // ✅ new
 
 /* =========================================================
    EXPRESS APP
@@ -231,6 +232,21 @@ app.post("/verify-otp", async (req, res) => {
 */
 
 app.use("/", sendEbookRoutes);
+
+/* =========================================================
+   STARTUP REGISTRATION ROUTE
+========================================================= */
+
+/*
+  registerStartup.js handle karega:
+
+  POST /register-startup
+  - Generates a unique Registration ID
+  - Emails it to the user via Resend
+  - Returns { success, registrationId } to the frontend
+*/
+
+app.use("/", registerStartupRoutes); // ✅ new
 
 /* =========================================================
    RAZORPAY PAYMENT ROUTES
