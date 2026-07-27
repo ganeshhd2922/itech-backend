@@ -85,7 +85,9 @@ app.post("/send-otp", async (req, res) => {
       });
     }
 
-    if (!process.env.API_KEY) {
+    const apiKey = String(process.env.API_KEY || "").trim();
+
+    if (!apiKey) {
       console.error("❌ API_KEY missing");
 
       return res.status(500).json({
@@ -95,7 +97,7 @@ app.post("/send-otp", async (req, res) => {
     }
 
     const url =
-      `https://2factor.in/API/V1/${process.env.API_KEY}` +
+      `https://2factor.in/API/V1/${apiKey}` +
       `/SMS/91${cleanPhone}/AUTOGEN?route=4`;
 
     console.log("📱 Sending OTP to:", `91${cleanPhone}`);
@@ -109,9 +111,14 @@ app.post("/send-otp", async (req, res) => {
     console.log("📩 2Factor Response:", data);
 
     if (data.Status !== "Success") {
-      throw new Error(
-        data.Details || "Failed to send OTP"
-      );
+      const details = data.Details || "Failed to send OTP";
+      // Friendlier message for common 2Factor misconfig
+      if (/invalid api key/i.test(String(details))) {
+        throw new Error(
+          "OTP service API key is invalid. Check API_KEY on Render (2Factor.in key)."
+        );
+      }
+      throw new Error(details);
     }
 
     return res.status(200).json({
@@ -151,7 +158,9 @@ app.post("/verify-otp", async (req, res) => {
       });
     }
 
-    if (!process.env.API_KEY) {
+    const apiKey = String(process.env.API_KEY || "").trim();
+
+    if (!apiKey) {
       console.error("❌ API_KEY missing");
 
       return res.status(500).json({
@@ -161,7 +170,7 @@ app.post("/verify-otp", async (req, res) => {
     }
 
     const url =
-      `https://2factor.in/API/V1/${process.env.API_KEY}` +
+      `https://2factor.in/API/V1/${apiKey}` +
       `/SMS/VERIFY/${sessionId}/${otp}`;
 
     console.log("🔐 Verifying OTP...");
