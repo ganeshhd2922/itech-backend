@@ -244,4 +244,50 @@ router.post(
   }
 );
 
+// Lookup by Startup Registration ID (used by Shortlisted form autofill)
+router.get("/register-startup/:id", (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim().toUpperCase();
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Registration ID is required" });
+    }
+
+    const record = registrations.find((r) => String(r.id).toUpperCase() === id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: "No registration found for this Startup ID. Please check and try again.",
+      });
+    }
+
+    // Return only fields needed for shortlisted form autofill (no files)
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: record.id,
+        startup_name: record.startup_name || "",
+        founder_name: record.founder_name || "",
+        email: record.email || "",
+        mobile: record.mobile || "",
+        state: record.state || "",
+        district: record.district || "",
+        city: record.city || "",
+        stage: record.stage || "",
+        sector: record.sector || "",
+        problem: record.problem || "",
+        customers: record.customers || "",
+        website: record.website || "",
+        linkedin: record.linkedin || "",
+        demo_link: record.demo_link || "",
+      },
+    });
+  } catch (err) {
+    console.error("❌ LOOKUP STARTUP ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong. Please try again.",
+    });
+  }
+});
+
 module.exports = router;

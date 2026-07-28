@@ -253,6 +253,10 @@ app.use("/", sendEbookRoutes);
   - Generates a unique Registration ID
   - Emails it to the user via Resend
   - Returns { success, registrationId } to the frontend
+
+  GET /register-startup/:id
+  - Looks up a registration by Startup ID
+  - Used by Shortlisted form to autofill founder/startup details
 */
 
 app.use("/", registerStartupRoutes); // ✅ new
