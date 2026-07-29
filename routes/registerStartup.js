@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const crypto = require("crypto");
 const { Resend } = require("resend");
+const { pool } = require("../db");
 
 const router = express.Router();
 
@@ -23,7 +24,43 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-const registrations = [];
+// Fallback in-memory store — only used if DATABASE_URL isn't configured
+// (e.g. local dev without Postgres). In production this is NOT persistent
+// across server restarts, which is exactly why Postgres is used when available.
+const memoryRegistrations = [];
+
+async function registrationIdExists(id) {
+  if (pool) {
+    const result = await pool.query(
+      "SELECT 1 FROM startup_registrations WHERE id = $1",
+      [id]
+    );
+    return result.rowCount > 0;
+  }
+  return memoryRegistrations.some((r) => r.id === id);
+}
+
+async function saveRegistration(record) {
+  if (pool) {
+    await pool.query(
+      "INSERT INTO startup_registrations (id, data) VALUES ($1, $2)",
+      [record.id, record]
+    );
+  } else {
+    memoryRegistrations.push(record);
+  }
+}
+
+async function findRegistrationById(id) {
+  if (pool) {
+    const result = await pool.query(
+      "SELECT data FROM startup_registrations WHERE id = $1",
+      [id]
+    );
+    return result.rows[0]?.data || null;
+  }
+  return memoryRegistrations.find((r) => String(r.id).toUpperCase() === id) || null;
+}
 
 function escapeHtml(value) {
   if (value === undefined || value === null) return "";
@@ -136,7 +173,7 @@ router.post(
       let registrationId;
       do {
         registrationId = generateRegistrationId();
-      } while (registrations.some((r) => r.id === registrationId));
+      } while (await registrationIdExists(registrationId));
 
       const record = {
         id: registrationId,
@@ -146,7 +183,16 @@ router.post(
         logo_file_name: logoFile?.originalname || null,
         createdAt: new Date().toISOString(),
       };
-      registrations.push(record);
+
+      try {
+        await saveRegistration(record);
+      } catch (dbErr) {
+        console.error("❌ SAVE REGISTRATION DB ERROR:", dbErr);
+        return res.status(500).json({
+          success: false,
+          message: "Could not save your registration. Please try again.",
+        });
+      }
 
       let adminEmailSent = false;
       let userEmailSent = false;
@@ -245,14 +291,14 @@ router.post(
 );
 
 // Lookup by Startup Registration ID (used by Shortlisted form autofill)
-router.get("/register-startup/:id", (req, res) => {
+router.get("/register-startup/:id", async (req, res) => {
   try {
     const id = String(req.params.id || "").trim().toUpperCase();
     if (!id) {
       return res.status(400).json({ success: false, message: "Registration ID is required" });
     }
 
-    const record = registrations.find((r) => String(r.id).toUpperCase() === id);
+    const record = await findRegistrationById(id);
     if (!record) {
       return res.status(404).json({
         success: false,

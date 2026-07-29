@@ -8,6 +8,7 @@ const cors = require("cors");
    ROUTES IMPORT
 ========================================================= */
 
+const { initDb } = require("./db");
 const sendEbookRoutes = require("./routes/sendEbook");
 const razorpayRoutes = require("./routes/razorpay-payment");
 const registerStartupRoutes = require("./routes/registerStartup"); // ✅ new
@@ -251,12 +252,13 @@ app.use("/", sendEbookRoutes);
 
   POST /register-startup
   - Generates a unique Registration ID
+  - Saves the registration to Postgres (DATABASE_URL) so it survives restarts
   - Emails it to the user via Resend
   - Returns { success, registrationId } to the frontend
 
   GET /register-startup/:id
-  - Looks up a registration by Startup ID
-  - Used by Shortlisted form to autofill founder/startup details
+  - Looks up a registration by Startup ID from Postgres
+  - Used by Shortlisted form to verify + autofill founder/startup details
 */
 
 app.use("/", registerStartupRoutes); // ✅ new
@@ -311,7 +313,7 @@ app.use((err, req, res, next) => {
    START SERVER
 ========================================================= */
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log("");
   console.log("==========================================");
   console.log("🚀 iTechnebula Backend Started");
@@ -329,6 +331,11 @@ app.listen(PORT, () => {
         : "NOT configured"
     }`
   );
+  console.log(
+    `🗄️  Postgres: ${process.env.DATABASE_URL ? "configured" : "NOT configured"}`
+  );
   console.log("==========================================");
   console.log("");
+
+  await initDb();
 });
