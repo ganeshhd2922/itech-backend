@@ -10,7 +10,26 @@
 
 const { Pool } = require("pg");
 
-const connectionString = process.env.DATABASE_URL;
+const rawConnectionString = process.env.DATABASE_URL;
+
+// pg-connection-string emits a "SECURITY WARNING" when it sees sslmode=require
+// (etc.) in the URL, since we already control SSL explicitly via the `ssl`
+// option below. Strip those query params so only our explicit config applies
+// and the warning is never triggered.
+function stripSslModeParams(urlString) {
+  try {
+    const url = new URL(urlString);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("channel_binding");
+    return url.toString();
+  } catch {
+    return urlString;
+  }
+}
+
+const connectionString = rawConnectionString
+  ? stripSslModeParams(rawConnectionString)
+  : rawConnectionString;
 
 const pool = connectionString
   ? new Pool({
